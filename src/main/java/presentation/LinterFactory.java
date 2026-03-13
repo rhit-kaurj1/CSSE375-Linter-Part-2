@@ -23,6 +23,9 @@ import domain.UnusedImportLinter;
 public class LinterFactory {
 
     public List<Linter> createLinters(LinterConfig config) {
+        // CODE SMELL: Hardcoded linter registration list creates shotgun-surgery when adding new linters
+        // (e.g., TODO/unused-variable/long-method/deep-nesting) because multiple files must be edited.
+        // Refactor direction: Registry/plugin-based linter discovery + metadata-driven configuration.
         List<Linter> linters = new ArrayList<>();
 
         // Create data layer dependencies (shared across linters if needed)

@@ -37,6 +37,8 @@ public class LeastKnowledgePrincipleExample {
             }
 
             public void c() {
+                // CODE SMELL: TODO placeholder implementation left in executable code path.
+                // Refactor direction: Replace with real behavior or explicit test double implementation.
                 // TODO Auto-generated method stub
                 throw new UnsupportedOperationException("Unimplemented method 'c'");
             }

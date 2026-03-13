@@ -23,6 +23,8 @@ import domain.UnusedImportLinter;
 
 public class LinterRunner {
 
+    // CODE SMELL: Duplicated hardcoded linter catalogs by file type.
+    // Refactor direction: Move this mapping to configurable metadata (per-linter supported input types).
     private static final List<Class<? extends Linter>> CLASS_FILE_LINTER_TYPES = List.of(
             SRPLinter.class,
             FacadePatternLinter.class,
@@ -86,6 +88,8 @@ public class LinterRunner {
     }
 
     private List<Linter> selectLinters(List<Class<? extends Linter>> linterTypes, List<Linter> availableLinters) {
+        // CODE SMELL: Nested loop type-matching is rigid and grows with every new linter.
+        // Refactor direction: Pre-index available linters by type or use a capability interface.
         List<Linter> selected = new ArrayList<>();
         for (Class<? extends Linter> linterType : linterTypes) {
             for (Linter linter : availableLinters) {

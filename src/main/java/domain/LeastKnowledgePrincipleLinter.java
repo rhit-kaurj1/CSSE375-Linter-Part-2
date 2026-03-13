@@ -61,6 +61,9 @@ public class LeastKnowledgePrincipleLinter implements Linter{
     }
 
     private List<Integer> findDemeterViolations(File file) throws IOException {
+        // CODE SMELL: Long method with deep nesting and multiple control flags/state transitions.
+        // Refactor direction: Extract pipeline steps (cleanLine, splitStatements, evaluateStatement)
+        // and replace flag-driven flow with smaller composable methods.
         List<Integer> linesWithIssues = new ArrayList<>();
         List<String> lines = Files.readAllLines(file.toPath());
 

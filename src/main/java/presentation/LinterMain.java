@@ -34,6 +34,9 @@ public class LinterMain {
     }
 
     public void run() {
+        // CODE SMELL: Multi-responsibility method (SRP violation). This method loads config,
+        // assembles linters, handles UI prompts, and orchestrates execution/output.
+        // Refactor direction: Extract ApplicationService/use-case methods for setup, input, and reporting.
         LinterConfig config = configLoader.loadConfig(DEFAULT_CONFIG_PATH);
         availableLinters.addAll(linterFactory.createLinters(config));
 
@@ -53,6 +56,8 @@ public class LinterMain {
     }
 
     private String askForFileInput() {
+        // CODE SMELL: Primitive obsession for user input (raw comma-separated String paths).
+        // Refactor direction: Introduce a FileSelectionRequest value object and selector strategy (CLI/UI).
         System.out.println();
         System.out.println("Enter file or folder path(s) to lint.");
         System.out.println("Use comma-separated paths for multiple entries.");
@@ -61,6 +66,8 @@ public class LinterMain {
     }
 
     private void displayResult(String result) {
+        // CODE SMELL: Output is tightly coupled to console, making file export/dashboard output harder.
+        // Refactor direction: Introduce OutputWriter abstraction (console/file/json/dashboard adapters).
         System.out.println();
         System.out.println("=== Lint Results ===");
         System.out.println(result);
