@@ -1,10 +1,4 @@
-This is the final project repository for CSSE 374 team:
+This is a continued linter project repository for CSSE 375 :
 
-JP Vastjens
-
-SK Nayeem
-
-Florence Medley
-
-Jasmeen Kaur (testing commit)
-
+Jasmeen Kaur
+Remi Schwartz
