@@ -50,6 +50,22 @@ public class LinterRunner {
         return runLintBatches(classFiles, nonClassFiles, availableLinters);
     }
 
+    public String runAllLinters(List<File> files, List<Linter> availableLinters) {
+        if (files == null || files.isEmpty()) {
+            return "No files to lint.";
+        }
+        if (availableLinters == null || availableLinters.isEmpty()) {
+            return "No linters configured.";
+        }
+
+        StringBuilder output = new StringBuilder();
+        for (Linter linter : availableLinters) {
+            output.append("[").append(linter.getClass().getSimpleName()).append("]").append(System.lineSeparator());
+            output.append(linter.lint(files)).append(System.lineSeparator()).append(System.lineSeparator());
+        }
+        return output.toString();
+    }
+
     private void splitFilesByType(List<File> files, List<File> classFiles, List<File> nonClassFiles) {
         for (File file : files) {
             if (isClassFile(file)) {

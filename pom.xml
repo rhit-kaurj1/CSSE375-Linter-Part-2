@@ -62,7 +62,7 @@
 					</descriptorRefs>
 					<archive>
 						<manifest>
-							<mainClass>presentation.LinterMain</mainClass>
+							<mainClass>presentation.SimpleLinterGui</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
