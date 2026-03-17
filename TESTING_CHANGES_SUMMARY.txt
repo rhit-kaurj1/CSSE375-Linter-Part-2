@@ -1,0 +1,95 @@
+Testing Changes Summary
+=======================
+
+Purpose
+-------
+This document summarizes the automated test changes added to the project, including where each change was made and why it was needed.
+
+Files Changed
+-------------
+1. README.md
+Why:
+- Added a simple instruction showing that `mvn test` is the one-step way to rerun the automated checks after refactoring.
+- This supports the milestone requirement that tests should be easy to run after changes.
+
+What changed:
+- Added a short note explaining that `mvn test` runs both the JUnit tests and the system-style workflow test.
+
+2. src/test/java/datastorage/ConfigLoaderTest.java
+Why:
+- The project already had some config loading coverage, but it did not cover important edge cases.
+- Configuration is a fragile area during refactoring because incorrect parsing can silently change which linters run or which thresholds they use.
+
+What changed:
+- Added a test to verify invalid numeric values fall back to defaults.
+- Added a test to verify blank `enabled_linters` behaves like "all linters enabled".
+
+Why these tests matter:
+- They protect against regressions in parsing behavior.
+- They verify the system still behaves safely when configuration files are partially wrong.
+
+3. src/test/java/presentation/LinterRunnerTest.java
+Why:
+- `LinterRunner` is the main orchestration class for grouping files and sending them to the correct linters.
+- This was a key missing area because it connects file types to the correct linting behavior.
+- Refactoring presentation/orchestration logic could easily break this behavior even if individual linter tests still pass.
+
+What changed:
+- Added a test that verifies `.class` files go only to class-based linters and `.java` files go only to source-based linters.
+- Added a test for `runAllLinters(...)` to confirm it handles empty inputs correctly and runs all configured linters when inputs are valid.
+
+Why these tests matter:
+- They verify batching and routing behavior.
+- They give protection around one of the most change-prone coordination points in the application.
+
+4. src/test/java/presentation/LinterFactoryTest.java
+Why:
+- `LinterFactory` is responsible for turning config into actual linter objects.
+- If this class breaks during refactoring, the program may run the wrong linters or use the wrong thresholds.
+
+What changed:
+- Added a test that verifies only explicitly enabled linters are created.
+- Added a test that verifies the `TooManyParametersLinter` receives the configured threshold.
+- Added a test that checks the default config still creates a broad expected linter catalog.
+
+Why these tests matter:
+- They confirm that configuration values are actually used.
+- They protect the object creation layer, which is often changed when improving architecture.
+
+5. src/test/java/system/LinterSystemTest.java
+Why:
+- The milestone asked for a system test similar to a full use case.
+- The project had unit-style tests for individual linters, but it needed a higher-level automated test that exercised the real workflow.
+
+What changed:
+- Added a system-style test that:
+  - creates a temporary input directory,
+  - writes a Java file with realistic issues,
+  - loads files through `FileLoader`,
+  - loads settings through `ConfigLoader`,
+  - creates linters through `LinterFactory`, and
+  - runs the full lint workflow through `LinterRunner`.
+- The test verifies that the output includes results from `SnakeLinter`, `UnusedImportLinter`, and `TrailingWhitespaceLinter`.
+
+Why this test matters:
+- It covers a real end-to-end use case.
+- It verifies that multiple classes work together correctly, not just in isolation.
+- It is especially useful after refactoring because it catches integration mistakes.
+
+Overall Testing Impact
+----------------------
+The added tests improve coverage in three important areas:
+- configuration parsing,
+- linter creation and orchestration,
+- and a full workflow system test.
+
+These additions do not yet cover everything in the project. In particular, GUI behavior in `src/main/java/presentation/SimpleLinterGui.java` is still not directly tested, and several individual linters could still use more dedicated test cases later.
+
+How to Run
+----------
+Use:
+`mvn test`
+
+Verification Result
+-------------------
+After adding these tests, the full Maven test suite passed successfully with 23 tests total.

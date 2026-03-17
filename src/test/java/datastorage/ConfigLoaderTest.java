@@ -45,4 +45,31 @@ class ConfigLoaderTest {
         assertTrue(config.isLinterEnabled(SRPLinter.class));
         assertFalse(config.isLinterEnabled(domain.SingletonPatternLinter.class));
     }
+
+    @Test
+    void fallsBackToDefaultsForInvalidNumericValues(@TempDir Path tempDir) throws IOException {
+        Path configFile = tempDir.resolve("invalid-numbers.properties");
+        Files.writeString(configFile, String.join(System.lineSeparator(),
+                "too_many_parameters_limit=-1",
+                "srp_lcom_threshold=not-a-number"));
+
+        ConfigLoader loader = new ConfigLoader();
+        LinterConfig config = loader.loadConfig(configFile.toString());
+
+        assertEquals(LinterConfig.DEFAULT_TOO_MANY_PARAMETERS_LIMIT, config.getTooManyParametersLimit());
+        assertEquals(LinterConfig.DEFAULT_SRP_LCOM_THRESHOLD, config.getSrpLcomThreshold());
+    }
+
+    @Test
+    void treatsBlankEnabledLintersAsAllEnabled(@TempDir Path tempDir) throws IOException {
+        Path configFile = tempDir.resolve("blank-enabled.properties");
+        Files.writeString(configFile, "enabled_linters=   ");
+
+        ConfigLoader loader = new ConfigLoader();
+        LinterConfig config = loader.loadConfig(configFile.toString());
+
+        assertTrue(config.isLinterEnabled(TooManyParametersLinter.class));
+        assertTrue(config.isLinterEnabled(SRPLinter.class));
+        assertTrue(config.getEnabledLinters().isEmpty());
+    }
 }

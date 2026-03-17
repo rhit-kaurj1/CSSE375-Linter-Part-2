@@ -2,3 +2,5 @@
 
 # Jasmeen Kaur
 # Remi Schwartz
+
+Run the automated checks with `mvn test`.
