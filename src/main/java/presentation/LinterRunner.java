@@ -2,8 +2,10 @@ package presentation;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import domain.AdapterPatternLinter;
 import domain.BooleanFlagMethodLinter;
@@ -23,9 +25,8 @@ import domain.UnusedImportLinter;
 
 public class LinterRunner {
 
-    // CODE SMELL: Duplicated hardcoded linter catalogs by file type.
-    // Refactor direction: Move this mapping to configurable metadata (per-linter supported input types).
-    private static final List<Class<? extends Linter>> CLASS_FILE_LINTER_TYPES = List.of(
+    private static final Map<String, List<Class<? extends Linter>>> LINTERS_BY_FILE_TYPE = Map.of(
+        "class", List.of(
             SRPLinter.class,
             FacadePatternLinter.class,
             StrategyPatternLinter.class,
@@ -36,18 +37,34 @@ public class LinterRunner {
             PublicNonFinalFieldLinter.class,
             TooManyParametersLinter.class,
             PlantUMLGenerator.class,
-            DesignRiskLinter.class);
-    private static final List<Class<? extends Linter>> NON_CLASS_FILE_LINTER_TYPES = List.of(
+            DesignRiskLinter.class
+        ),
+        "nonClass", List.of(
             SnakeLinter.class,
             UnusedImportLinter.class,
-            TrailingWhitespaceLinter.class);
+            TrailingWhitespaceLinter.class
+        )
+    );
+
 
     public String run(List<File> files, List<Linter> availableLinters) {
-        List<File> classFiles = new ArrayList<>();
-        List<File> nonClassFiles = new ArrayList<>();
-        splitFilesByType(files, classFiles, nonClassFiles);
+        if (files == null || files.isEmpty()) {
+            return "No files to lint.";
+        }
+        if (availableLinters == null || availableLinters.isEmpty()) {
+            return "No linters configured.";
+        }
 
-        return runLintBatches(classFiles, nonClassFiles, availableLinters);
+        Map<Class<? extends Linter>, Linter> indexedLinters = indexLintersByType(availableLinters);
+        Map<String, List<File>> filesByType = splitFilesByType(files);
+
+        StringBuilder output = new StringBuilder();
+        appendLintSection(output, ".class Files", filesByType.get("class"),
+            getConfiguredLinters("class", indexedLinters));
+        appendLintSection(output, "Non-.class Files", filesByType.get("nonClass"),
+            getConfiguredLinters("nonClass", indexedLinters));
+
+        return output.length() == 0 ? "No files to lint." : output.toString();
     }
 
     public String runAllLinters(List<File> files, List<Linter> availableLinters) {
@@ -58,76 +75,90 @@ public class LinterRunner {
             return "No linters configured.";
         }
 
-        StringBuilder output = new StringBuilder();
-        for (Linter linter : availableLinters) {
-            output.append("[").append(linter.getClass().getSimpleName()).append("]").append(System.lineSeparator());
-            output.append(linter.lint(files)).append(System.lineSeparator()).append(System.lineSeparator());
-        }
-        return output.toString();
+        return runLinters(availableLinters, files);
     }
 
-    private void splitFilesByType(List<File> files, List<File> classFiles, List<File> nonClassFiles) {
+    private Map<Class<? extends Linter>, Linter> indexLintersByType(List<Linter> availableLinters) {
+        Map<Class<? extends Linter>, Linter> indexedLinters = new LinkedHashMap<>();
+        for (Linter linter : availableLinters) {
+            indexedLinters.put(linter.getClass(), linter);
+        }
+        return indexedLinters;
+    }
+
+    private Map<String, List<File>> splitFilesByType(List<File> files) {
+        Map<String, List<File>> filesByType = new LinkedHashMap<>();
+        filesByType.put("class", new ArrayList<>());
+        filesByType.put("nonClass", new ArrayList<>());
+
         for (File file : files) {
             if (isClassFile(file)) {
-                classFiles.add(file);
+                filesByType.get("class").add(file);
             } else {
-                nonClassFiles.add(file);
+                filesByType.get("nonClass").add(file);
             }
         }
+
+        return filesByType;
     }
 
     private boolean isClassFile(File file) {
         return file.getName().toLowerCase(Locale.ROOT).endsWith(".class");
     }
 
-    private String runLintBatches(List<File> classFiles, List<File> nonClassFiles, List<Linter> availableLinters) {
-        StringBuilder output = new StringBuilder();
+    private List<Linter> getConfiguredLinters(
+        String fileType,
+        Map<Class<? extends Linter>, Linter> indexedLinters) {
 
-        if (!classFiles.isEmpty()) {
-            output.append("=== .class Files ===").append(System.lineSeparator());
-            output.append(runLinters(selectLinters(CLASS_FILE_LINTER_TYPES, availableLinters), classFiles));
-        }
+        List<Linter> selectedLinters = new ArrayList<>();
+        List<Class<? extends Linter>> configuredTypes =
+                LINTERS_BY_FILE_TYPE.getOrDefault(fileType, List.of());
 
-        if (!nonClassFiles.isEmpty()) {
-            if (output.length() > 0) {
-                output.append(System.lineSeparator());
+        for (Class<? extends Linter> linterType : configuredTypes) {
+            Linter linter = indexedLinters.get(linterType);
+            if (linter != null) {
+                selectedLinters.add(linter);
             }
-            output.append("=== Non-.class Files ===").append(System.lineSeparator());
-            output.append(runLinters(selectLinters(NON_CLASS_FILE_LINTER_TYPES, availableLinters), nonClassFiles));
         }
 
-        if (output.length() == 0) {
-            return "No files to lint.";
-        }
-
-        return output.toString();
+        return selectedLinters;
     }
 
-    private List<Linter> selectLinters(List<Class<? extends Linter>> linterTypes, List<Linter> availableLinters) {
-        // CODE SMELL: Nested loop type-matching is rigid and grows with every new linter.
-        // Refactor direction: Pre-index available linters by type or use a capability interface.
-        List<Linter> selected = new ArrayList<>();
-        for (Class<? extends Linter> linterType : linterTypes) {
-            for (Linter linter : availableLinters) {
-                if (linterType.isInstance(linter)) {
-                    selected.add(linter);
-                    break;
-                }
-            }
+    private void appendLintSection(
+        StringBuilder output,
+        String sectionTitle,
+        List<File> files,
+        List<Linter> linters) {
+
+        if (files == null || files.isEmpty()) {
+            return;
         }
-        return selected;
+
+        if (output.length() > 0) {
+            output.append(System.lineSeparator());
+        }
+
+        output.append("=== ").append(sectionTitle).append(" ===")
+            .append(System.lineSeparator());
+        output.append(runLinters(linters, files));
     }
 
     private String runLinters(List<Linter> linters, List<File> files) {
-        if (linters.isEmpty()) {
+        if (linters == null || linters.isEmpty()) {
             return "No linters configured for this file type." + System.lineSeparator();
         }
 
         StringBuilder output = new StringBuilder();
         for (Linter linter : linters) {
-            output.append("[").append(linter.getClass().getSimpleName()).append("]").append(System.lineSeparator());
-            output.append(linter.lint(files)).append(System.lineSeparator()).append(System.lineSeparator());
+            output.append("[")
+                .append(linter.getClass().getSimpleName())
+                .append("]")
+                .append(System.lineSeparator());
+            output.append(linter.lint(files))
+                .append(System.lineSeparator())
+                .append(System.lineSeparator());
         }
+
         return output.toString();
     }
 }
