@@ -9,10 +9,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -41,12 +45,17 @@ public class SimpleLinterGui extends JFrame {
     private final JButton addFilesButton;
     private final JButton removeSelectedButton;
     private final JButton clearAllButton;
-    private final JButton runAllLintersButton;
+    private final JButton runLintersButton;
     private final JButton saveOutputButton;
+    private final JButton selectAllLintersButton;
+    private final JButton deselectAllLintersButton;
 
     private final LinterFactory linterFactory;
     private final LinterRunner linterRunner;
     private final ConfigLoader configLoader;
+
+    private final List<Linter> allAvailableLinters;
+    private final Map<Linter, JCheckBox> linterCheckBoxes;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -66,12 +75,25 @@ public class SimpleLinterGui extends JFrame {
         this.addFilesButton = new JButton("Add Files");
         this.removeSelectedButton = new JButton("Remove Selected");
         this.clearAllButton = new JButton("Clear All");
-        this.runAllLintersButton = new JButton("Run All Linters");
+        this.runLintersButton = new JButton("Run Linters");
         this.saveOutputButton = new JButton("Save Output");
+        this.selectAllLintersButton = new JButton("Select All");
+        this.deselectAllLintersButton = new JButton("Deselect All");
 
         this.linterFactory = new LinterFactory();
         this.linterRunner = new LinterRunner();
         this.configLoader = new ConfigLoader();
+
+        LinterConfig config = this.configLoader.loadConfig(DEFAULT_CONFIG_PATH);
+        LinterConfig runAllConfig = new LinterConfig(
+                null,
+                config.getTooManyParametersLimit(),
+                config.getSrpLcomThreshold());
+        this.allAvailableLinters = this.linterFactory.createLinters(runAllConfig);
+        this.linterCheckBoxes = new LinkedHashMap<>();
+        for (Linter linter : this.allAvailableLinters) {
+            this.linterCheckBoxes.put(linter, new JCheckBox(linter.getClass().getSimpleName(), false));
+        }
 
         configureWindow();
         configureComponents();
@@ -107,15 +129,34 @@ public class SimpleLinterGui extends JFrame {
         filePanel.add(fileListScrollPane, BorderLayout.CENTER);
         filePanel.add(fileButtonsPanel, BorderLayout.SOUTH);
 
+        JPanel checkBoxesPanel = new JPanel();
+        checkBoxesPanel.setLayout(new BoxLayout(checkBoxesPanel, BoxLayout.Y_AXIS));
+        for (JCheckBox checkBox : linterCheckBoxes.values()) {
+            checkBoxesPanel.add(checkBox);
+        }
+        JScrollPane checkBoxesScrollPane = new JScrollPane(checkBoxesPanel);
+        
+        JPanel linterButtonsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        linterButtonsPanel.add(selectAllLintersButton);
+        linterButtonsPanel.add(deselectAllLintersButton);
+
+        JPanel linterPanel = new JPanel(new BorderLayout(5, 5));
+        linterPanel.add(new JLabel("Select Linters"), BorderLayout.NORTH);
+        linterPanel.add(checkBoxesScrollPane, BorderLayout.CENTER);
+        linterPanel.add(linterButtonsPanel, BorderLayout.SOUTH);
+
+        JSplitPane leftSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, filePanel, linterPanel);
+        leftSplitPane.setResizeWeight(0.5);
+
         JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actionPanel.add(runAllLintersButton);
+        actionPanel.add(runLintersButton);
         actionPanel.add(saveOutputButton);
 
         JPanel resultsPanel = new JPanel(new BorderLayout(5, 5));
         resultsPanel.add(new JLabel("Results"), BorderLayout.NORTH);
         resultsPanel.add(resultsScrollPane, BorderLayout.CENTER);
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, filePanel, resultsPanel);
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftSplitPane, resultsPanel);
         splitPane.setResizeWeight(0.35);
 
         JPanel bottomPanel = new JPanel(new BorderLayout(5, 5));
@@ -130,8 +171,22 @@ public class SimpleLinterGui extends JFrame {
         addFilesButton.addActionListener(e -> onAddFiles());
         removeSelectedButton.addActionListener(e -> onRemoveSelected());
         clearAllButton.addActionListener(e -> onClearAll());
-        runAllLintersButton.addActionListener(e -> onRunAllLinters());
+        runLintersButton.addActionListener(e -> onRunLinters());
         saveOutputButton.addActionListener(e -> onSaveOutput());
+        selectAllLintersButton.addActionListener(e -> onSelectAllLinters());
+        deselectAllLintersButton.addActionListener(e -> onDeselectAllLinters());
+    }
+
+    private void onSelectAllLinters() {
+        for (JCheckBox checkBox : linterCheckBoxes.values()) {
+            checkBox.setSelected(true);
+        }
+    }
+
+    private void onDeselectAllLinters() {
+        for (JCheckBox checkBox : linterCheckBoxes.values()) {
+            checkBox.setSelected(false);
+        }
     }
 
     private void onAddFiles() {
@@ -173,10 +228,23 @@ public class SimpleLinterGui extends JFrame {
         statusLabel.setText("Ready");
     }
 
-    private void onRunAllLinters() {
+    private void onRunLinters() {
         List<File> selectedFiles = getSelectedFiles();
         if (selectedFiles.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please add at least one file.", "No Files Selected",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        List<Linter> selectedLinters = new ArrayList<>();
+        for (Map.Entry<Linter, JCheckBox> entry : linterCheckBoxes.entrySet()) {
+            if (entry.getValue().isSelected()) {
+                selectedLinters.add(entry.getKey());
+            }
+        }
+
+        if (selectedLinters.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please select at least one linter.", "No Linters Selected",
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -198,19 +266,12 @@ public class SimpleLinterGui extends JFrame {
         }
 
         setRunningState(true);
-        resultArea.setText("Running all linters...\n");
+        resultArea.setText("Running selected linters...\n");
 
         SwingWorker<String, Void> worker = new SwingWorker<>() {
             @Override
             protected String doInBackground() {
-                LinterConfig config = configLoader.loadConfig(DEFAULT_CONFIG_PATH);
-                LinterConfig runAllConfig = new LinterConfig(
-                        null,
-                        config.getTooManyParametersLimit(),
-                        config.getSrpLcomThreshold());
-
-                List<Linter> availableLinters = linterFactory.createLinters(runAllConfig);
-                String output = linterRunner.runAllLinters(readableFiles, availableLinters);
+                String output = linterRunner.runAllLinters(readableFiles, selectedLinters);
                 return addRunSummary(output, readableFiles.size(), skippedFiles);
             }
 
@@ -313,8 +374,10 @@ public class SimpleLinterGui extends JFrame {
         addFilesButton.setEnabled(!running);
         removeSelectedButton.setEnabled(!running);
         clearAllButton.setEnabled(!running);
-        runAllLintersButton.setEnabled(!running);
+        runLintersButton.setEnabled(!running);
         saveOutputButton.setEnabled(!running);
+        selectAllLintersButton.setEnabled(!running);
+        deselectAllLintersButton.setEnabled(!running);
 
         if (running) {
             statusLabel.setText("Running...");
