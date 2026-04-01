@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - milestone-2
+      - milestone-3
+      - milestone-4
+  pull_request:
+    branches:
+      - main
+      - milestone-2
+      - milestone-3
+      - milestone-4
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build
+        run: echo "Add your build command here"
+
+      - name: Run tests
+        run: echo "Add your test command here"
