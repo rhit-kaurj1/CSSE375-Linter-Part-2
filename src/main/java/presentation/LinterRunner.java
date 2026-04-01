@@ -55,14 +55,13 @@ public class LinterRunner {
             return "No linters configured.";
         }
 
-        Map<Class<? extends Linter>, Linter> indexedLinters = indexLintersByType(availableLinters);
         Map<String, List<File>> filesByType = splitFilesByType(files);
 
         StringBuilder output = new StringBuilder();
         appendLintSection(output, ".class Files", filesByType.get("class"),
-            getConfiguredLinters("class", indexedLinters));
+            getConfiguredLinters("class", availableLinters));
         appendLintSection(output, "Non-.class Files", filesByType.get("nonClass"),
-            getConfiguredLinters("nonClass", indexedLinters));
+            getConfiguredLinters("nonClass", availableLinters));
 
         return output.length() == 0 ? "No files to lint." : output.toString();
     }
@@ -76,14 +75,6 @@ public class LinterRunner {
         }
 
         return runLinters(availableLinters, files);
-    }
-
-    private Map<Class<? extends Linter>, Linter> indexLintersByType(List<Linter> availableLinters) {
-        Map<Class<? extends Linter>, Linter> indexedLinters = new LinkedHashMap<>();
-        for (Linter linter : availableLinters) {
-            indexedLinters.put(linter.getClass(), linter);
-        }
-        return indexedLinters;
     }
 
     private Map<String, List<File>> splitFilesByType(List<File> files) {
@@ -108,20 +99,36 @@ public class LinterRunner {
 
     private List<Linter> getConfiguredLinters(
         String fileType,
-        Map<Class<? extends Linter>, Linter> indexedLinters) {
+        List<Linter> availableLinters) {
 
         List<Linter> selectedLinters = new ArrayList<>();
         List<Class<? extends Linter>> configuredTypes =
                 LINTERS_BY_FILE_TYPE.getOrDefault(fileType, List.of());
 
         for (Class<? extends Linter> linterType : configuredTypes) {
-            Linter linter = indexedLinters.get(linterType);
+            Linter linter = findCompatibleLinter(linterType, availableLinters, selectedLinters);
             if (linter != null) {
                 selectedLinters.add(linter);
             }
         }
 
         return selectedLinters;
+    }
+
+    private Linter findCompatibleLinter(
+        Class<? extends Linter> expectedType,
+        List<Linter> availableLinters,
+        List<Linter> alreadySelected) {
+
+        for (Linter candidate : availableLinters) {
+            if (alreadySelected.contains(candidate)) {
+                continue;
+            }
+            if (expectedType.isInstance(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private void appendLintSection(
