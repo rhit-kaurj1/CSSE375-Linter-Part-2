@@ -22,14 +22,14 @@ public class LeastKnowledgePrincipleLinter implements Linter{
         StringBuilder result = new StringBuilder();
         int violationCount = 0;
 
+        List<File> javaFiles = new ArrayList<>();
         for (File file : files) {
+            collectJavaFiles(file, javaFiles);
+        }
+
+        for (File file : javaFiles) {
             if (!file.exists() || !file.isFile()) {
                 result.append("Skipping invalid file: ").append(file.getPath()).append(System.lineSeparator());
-                continue;
-            }
-
-            if (!file.getName().endsWith(".java")) {
-                // Only analyze Java source files for Law of Demeter violations
                 continue;
             }
 
@@ -58,6 +58,19 @@ public class LeastKnowledgePrincipleLinter implements Linter{
 
         result.append("Total least knowledge principle issues: ").append(violationCount);
         return result.toString();
+    }
+
+    private void collectJavaFiles(File file, List<File> javaFiles) {
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    collectJavaFiles(child, javaFiles);
+                }
+            }
+        } else if (file.getName().endsWith(".java")) {
+            javaFiles.add(file);
+        }
     }
 
     private List<Integer> findDemeterViolations(File file) throws IOException {

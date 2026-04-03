@@ -65,7 +65,7 @@ final class LintRunCoordinator {
         List<File> readableFiles = new ArrayList<>();
         List<File> skippedFiles = new ArrayList<>();
         for (File file : selectedFiles) {
-            if (file.exists() && file.isFile() && file.canRead()) {
+            if (file.exists() && file.canRead()) {
                 readableFiles.add(file);
             } else {
                 skippedFiles.add(file);
