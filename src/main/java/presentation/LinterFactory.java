@@ -8,6 +8,7 @@ import domain.BooleanFlagMethodLinter;
 import domain.DecoratorPatternLinter;
 import domain.DesignRiskLinter;
 import domain.FacadePatternLinter;
+import domain.LeastKnowledgePrincipleLinter;
 import domain.Linter;
 import domain.LinterConfig;
 import domain.PlantUMLGenerator;
@@ -23,9 +24,12 @@ import domain.UnusedImportLinter;
 public class LinterFactory {
 
     public List<Linter> createLinters(LinterConfig config) {
-        // CODE SMELL: Hardcoded linter registration list creates shotgun-surgery when adding new linters
-        // (e.g., TODO/unused-variable/long-method/deep-nesting) because multiple files must be edited.
-        // Refactor direction: Registry/plugin-based linter discovery + metadata-driven configuration.
+        // CODE SMELL: Hardcoded linter registration list creates shotgun-surgery when
+        // adding new linters
+        // (e.g., TODO/unused-variable/long-method/deep-nesting) because multiple files
+        // must be edited.
+        // Refactor direction: Registry/plugin-based linter discovery + metadata-driven
+        // configuration.
         List<Linter> linters = new ArrayList<>();
 
         // Create data layer dependencies (shared across linters if needed)
@@ -45,6 +49,7 @@ public class LinterFactory {
         addIfEnabled(linters, new SingletonPatternLinter(asmReader), SingletonPatternLinter.class, config);
         addIfEnabled(linters, new DecoratorPatternLinter(asmReader), DecoratorPatternLinter.class, config);
         addIfEnabled(linters, new AdapterPatternLinter(asmReader), AdapterPatternLinter.class, config);
+        addIfEnabled(linters, new LeastKnowledgePrincipleLinter(), LeastKnowledgePrincipleLinter.class, config);
         addIfEnabled(linters, new BooleanFlagMethodLinter(asmReader), BooleanFlagMethodLinter.class, config);
         addIfEnabled(linters, new PlantUMLGenerator(), PlantUMLGenerator.class, config);
         addIfEnabled(linters, new UnusedImportLinter(), UnusedImportLinter.class, config);

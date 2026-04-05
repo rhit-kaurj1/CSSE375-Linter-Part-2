@@ -16,9 +16,9 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 final class SimpleLinterGuiUiSupport {
     JFileChooser createAddFilesChooser() {
         JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Select File(s) to Lint");
+        chooser.setDialogTitle("Select File(s) or Folder(s) to Lint");
         chooser.setMultiSelectionEnabled(true);
-        chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
         chooser.setAcceptAllFileFilterUsed(true);
         chooser.addChoosableFileFilter(new FileNameExtensionFilter("Java/Class Files", "java", "class"));
         return chooser;
