@@ -1,5 +1,6 @@
 package presentation;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -89,7 +90,12 @@ public class SimpleLinterGui extends JFrame {
             return;
         }
 
-        fileSelectionModel.addFiles(chooser.getSelectedFiles());
+        File[] selectedFiles = chooser.getSelectedFiles();
+        if (!uiSupport.confirmFilePreview(this, List.of(selectedFiles))) {
+            return;
+        }
+
+        fileSelectionModel.addFiles(selectedFiles);
         uiSupport.showSelectedFilesStatus(view, fileSelectionModel.size());
     }
 
