@@ -26,7 +26,7 @@ final class SimpleLinterGuiUiSupport {
 
     JFileChooser createSaveOutputChooser() {
         JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Save Linter Output");
+        chooser.setDialogTitle("Export Linter Output");
         chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
         chooser.setSelectedFile(new File("linter-output.txt"));
         return chooser;

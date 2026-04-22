@@ -37,7 +37,7 @@ final class SimpleLinterGuiView {
         this.removeSelectedButton = new JButton("Remove Selected");
         this.clearAllButton = new JButton("Clear All");
         this.runLintersButton = new JButton("Run Linters");
-        this.saveOutputButton = new JButton("Save Output");
+        this.saveOutputButton = new JButton("Export");
         this.selectAllLintersButton = new JButton("Select All");
         this.deselectAllLintersButton = new JButton("Deselect All");
         this.resultArea = new JTextArea();

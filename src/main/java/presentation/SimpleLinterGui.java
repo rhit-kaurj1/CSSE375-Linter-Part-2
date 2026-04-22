@@ -2,8 +2,6 @@ package presentation;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -14,6 +12,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import datastorage.ConfigLoader;
+import datastorage.OutputExporter;
 import domain.Linter;
 import domain.LinterConfig;
 
@@ -25,6 +24,7 @@ public class SimpleLinterGui extends JFrame {
     private final SimpleLinterGuiView view;
     private final LintRunSummaryFormatter summaryFormatter;
     private final LintRunCoordinator lintRunCoordinator;
+    private final OutputExporter outputExporter;
     private final SimpleLinterGuiUiSupport uiSupport;
 
     private final LinterFactory linterFactory;
@@ -47,6 +47,7 @@ public class SimpleLinterGui extends JFrame {
         this.fileSelectionModel = new FileSelectionModel();
         this.summaryFormatter = new LintRunSummaryFormatter();
         this.lintRunCoordinator = new LintRunCoordinator(this.linterRunner, this.summaryFormatter);
+        this.outputExporter = new OutputExporter();
         this.uiSupport = new SimpleLinterGuiUiSupport();
 
         LinterConfig config = this.configLoader.loadConfig(DEFAULT_CONFIG_PATH);
@@ -164,11 +165,6 @@ public class SimpleLinterGui extends JFrame {
 
     private void onSaveOutput() {
         String output = view.getResultArea().getText();
-        if (output == null || output.trim().isEmpty()) {
-            uiSupport.showInfo(this, "No output to save.", "Nothing to Save");
-            return;
-        }
-
         JFileChooser chooser = uiSupport.createSaveOutputChooser();
 
         int result = chooser.showSaveDialog(this);
@@ -178,10 +174,11 @@ public class SimpleLinterGui extends JFrame {
 
         Path outputPath = chooser.getSelectedFile().toPath();
         try {
-            Files.writeString(outputPath, output, StandardCharsets.UTF_8);
-            view.getStatusLabel().setText("Saved: " + outputPath.getFileName());
+            outputExporter.export(outputPath, output);
+            view.getStatusLabel().setText("Exported: " + outputPath.getFileName());
+            uiSupport.showInfo(this, "Output exported successfully.", "Export Complete");
         } catch (IOException ex) {
-            uiSupport.showError(this, "Could not save output: " + ex.getMessage(), "Save Failed");
+            uiSupport.showError(this, "Could not export output: " + ex.getMessage(), "Export Failed");
         }
     }
 
