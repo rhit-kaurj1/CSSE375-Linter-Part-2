@@ -71,6 +71,7 @@ public class SimpleLinterGui extends JFrame {
         view.getClearAllButton().addActionListener(e -> onClearAll());
         view.getRunLintersButton().addActionListener(e -> onRunLinters());
         view.getSaveOutputButton().addActionListener(e -> onSaveOutput());
+        view.getClearResultsAndLintersButton().addActionListener(e -> onClearResultsAndLinters());
         view.getSelectAllLintersButton().addActionListener(e -> onSelectAllLinters());
         view.getDeselectAllLintersButton().addActionListener(e -> onDeselectAllLinters());
     }
@@ -110,6 +111,12 @@ public class SimpleLinterGui extends JFrame {
         view.getStatusLabel().setText("Ready");
     }
 
+    private void onClearResultsAndLinters() {
+        view.getResultArea().setText("");
+        linterSelectionModel.deselectAll();
+        view.getStatusLabel().setText("Ready");
+    }
+
     private void onRunLinters() {
         LintRunCoordinator.Preparation preparation = lintRunCoordinator.prepare(
                 fileSelectionModel.getAllFiles(),
@@ -140,7 +147,9 @@ public class SimpleLinterGui extends JFrame {
         SwingWorker<String, Void> worker = new SwingWorker<>() {
             @Override
             protected String doInBackground() {
-                return lintRunCoordinator.run(preparation);
+                return lintRunCoordinator.run(preparation, completed -> {
+                    // Progress bar removed; no per-linter UI progress updates.
+                });
             }
 
             @Override

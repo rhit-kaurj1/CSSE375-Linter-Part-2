@@ -25,6 +25,7 @@ final class SimpleLinterGuiView {
     private final JButton clearAllButton;
     private final JButton runLintersButton;
     private final JButton saveOutputButton;
+    private final JButton clearResultsAndLintersButton;
     private final JButton selectAllLintersButton;
     private final JButton deselectAllLintersButton;
 
@@ -38,6 +39,7 @@ final class SimpleLinterGuiView {
         this.clearAllButton = new JButton("Clear All");
         this.runLintersButton = new JButton("Run Linters");
         this.saveOutputButton = new JButton("Export");
+        this.clearResultsAndLintersButton = new JButton("New Run");
         this.selectAllLintersButton = new JButton("Select All");
         this.deselectAllLintersButton = new JButton("Deselect All");
         this.resultArea = new JTextArea();
@@ -67,6 +69,10 @@ final class SimpleLinterGuiView {
         return saveOutputButton;
     }
 
+    JButton getClearResultsAndLintersButton() {
+        return clearResultsAndLintersButton;
+    }
+
     JButton getSelectAllLintersButton() {
         return selectAllLintersButton;
     }
@@ -89,6 +95,7 @@ final class SimpleLinterGuiView {
         clearAllButton.setEnabled(!running);
         runLintersButton.setEnabled(!running);
         saveOutputButton.setEnabled(!running);
+        clearResultsAndLintersButton.setEnabled(!running);
         selectAllLintersButton.setEnabled(!running);
         deselectAllLintersButton.setEnabled(!running);
 
@@ -146,6 +153,7 @@ final class SimpleLinterGuiView {
         JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         actionPanel.add(runLintersButton);
         actionPanel.add(saveOutputButton);
+        actionPanel.add(clearResultsAndLintersButton);
 
         JPanel resultsPanel = new JPanel(new BorderLayout(5, 5));
         resultsPanel.add(new JLabel("Results"), BorderLayout.NORTH);

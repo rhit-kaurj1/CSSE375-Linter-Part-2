@@ -3,6 +3,7 @@ package presentation;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntConsumer;
 
 import domain.Linter;
 
@@ -82,7 +83,14 @@ final class LintRunCoordinator {
     }
 
     String run(Preparation preparation) {
-        String output = linterRunner.runAllLinters(preparation.getReadableFiles(), preparation.getSelectedLinters());
+        return run(preparation, null);
+    }
+
+    String run(Preparation preparation, IntConsumer onLinterCompleted) {
+        String output = linterRunner.runAllLinters(
+                preparation.getReadableFiles(),
+                preparation.getSelectedLinters(),
+                onLinterCompleted);
         return summaryFormatter.addRunSummary(output, preparation.getReadableFiles().size(), preparation.getSkippedFiles());
     }
 

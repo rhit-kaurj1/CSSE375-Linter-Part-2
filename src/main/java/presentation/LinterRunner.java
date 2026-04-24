@@ -1,11 +1,22 @@
 package presentation;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.IntConsumer;
+
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
 
 import domain.AdapterPatternLinter;
 import domain.BooleanFlagMethodLinter;
@@ -67,6 +78,10 @@ public class LinterRunner {
     }
 
     public String runAllLinters(List<File> files, List<Linter> availableLinters) {
+        return runAllLinters(files, availableLinters, null);
+    }
+
+    public String runAllLinters(List<File> files, List<Linter> availableLinters, IntConsumer onLinterCompleted) {
         if (files == null || files.isEmpty()) {
             return "No files to lint.";
         }
@@ -74,7 +89,103 @@ public class LinterRunner {
             return "No linters configured.";
         }
 
-        return runLinters(availableLinters, files);
+        List<File> preparedFiles = prepareFilesForAllLinters(files);
+        return runLinters(availableLinters, preparedFiles, onLinterCompleted);
+    }
+
+    private List<File> prepareFilesForAllLinters(List<File> files) {
+        List<File> preparedFiles = new ArrayList<>(files);
+        List<File> javaSourceFiles = collectJavaSources(files);
+        if (javaSourceFiles.isEmpty()) {
+            return preparedFiles;
+        }
+
+        File compiledDirectory = compileJavaSources(javaSourceFiles);
+        if (compiledDirectory != null) {
+            preparedFiles.add(compiledDirectory);
+        }
+
+        return preparedFiles;
+    }
+
+    private List<File> collectJavaSources(List<File> files) {
+        Set<File> javaSources = new LinkedHashSet<>();
+        for (File file : files) {
+            collectJavaSourcesRecursively(file, javaSources);
+        }
+        return new ArrayList<>(javaSources);
+    }
+
+    private void collectJavaSourcesRecursively(File file, Set<File> javaSources) {
+        if (file == null || !file.exists() || !file.canRead()) {
+            return;
+        }
+
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children == null) {
+                return;
+            }
+            for (File child : children) {
+                collectJavaSourcesRecursively(child, javaSources);
+            }
+            return;
+        }
+
+        if (file.getName().toLowerCase(Locale.ROOT).endsWith(".java")) {
+            javaSources.add(file);
+        }
+    }
+
+    private File compileJavaSources(List<File> javaSourceFiles) {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            return null;
+        }
+
+        Path outputDirectory;
+        try {
+            outputDirectory = Files.createTempDirectory("linter-compiled-sources-");
+        } catch (IOException e) {
+            return null;
+        }
+        File outputDirectoryFile = outputDirectory.toFile();
+        outputDirectoryFile.deleteOnExit();
+
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null)) {
+            List<String> options = new ArrayList<>();
+            options.add("-d");
+            options.add(outputDirectory.toString());
+
+            String runtimeClasspath = System.getProperty("java.class.path");
+            if (runtimeClasspath != null && !runtimeClasspath.isBlank()) {
+                options.add("-classpath");
+                options.add(runtimeClasspath);
+            }
+
+            int compiledCount = 0;
+            for (File javaSourceFile : javaSourceFiles) {
+                Iterable<? extends JavaFileObject> compilationUnit =
+                        fileManager.getJavaFileObjectsFromFiles(List.of(javaSourceFile));
+                JavaCompiler.CompilationTask task = compiler.getTask(
+                        null,
+                        fileManager,
+                        null,
+                        options,
+                        null,
+                        compilationUnit);
+                if (Boolean.TRUE.equals(task.call())) {
+                    compiledCount++;
+                }
+            }
+
+            if (compiledCount > 0) {
+                return outputDirectoryFile;
+            }
+            return null;
+        } catch (IOException ex) {
+            return null;
+        }
     }
 
     private Map<String, List<File>> splitFilesByType(List<File> files) {
@@ -151,19 +262,33 @@ public class LinterRunner {
     }
 
     private String runLinters(List<Linter> linters, List<File> files) {
+        return runLinters(linters, files, null);
+    }
+
+    private String runLinters(List<Linter> linters, List<File> files, IntConsumer onLinterCompleted) {
         if (linters == null || linters.isEmpty()) {
             return "No linters configured for this file type." + System.lineSeparator();
         }
 
         StringBuilder output = new StringBuilder();
+        int completedLinters = 0;
         for (Linter linter : linters) {
             output.append("[")
                 .append(linter.getClass().getSimpleName())
                 .append("]")
                 .append(System.lineSeparator());
-            output.append(linter.lint(files))
+            String lintResult = linter.lint(files);
+            if (lintResult == null || lintResult.isBlank()) {
+                lintResult = "No findings reported by this linter.";
+            }
+            output.append(lintResult)
                 .append(System.lineSeparator())
                 .append(System.lineSeparator());
+
+            completedLinters++;
+            if (onLinterCompleted != null) {
+                onLinterCompleted.accept(completedLinters);
+            }
         }
 
         return output.toString();

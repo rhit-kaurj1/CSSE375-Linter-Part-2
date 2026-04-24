@@ -1,20 +1,21 @@
 package presentation;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import datastorage.ASMReader;
 import domain.SnakeLinter;
 import domain.TooManyParametersLinter;
+import domain.UnusedImportLinter;
 
 class LinterRunnerTest {
 
@@ -58,6 +59,80 @@ class LinterRunnerTest {
         assertTrue(result.contains("snake-output"));
         assertTrue(result.contains("params-output"));
     }
+
+    @Test
+    void runAllLintersProgressCallbackIsCalledAfterEachLinter(@TempDir Path tempDir) throws IOException {
+        LinterRunner runner = new LinterRunner();
+        Path javaFile = Files.writeString(tempDir.resolve("Example.java"), "class sample_file {}\n");
+
+        AtomicInteger lastCompletedCount = new AtomicInteger();
+        runner.runAllLinters(
+                List.of(javaFile.toFile()),
+                List.of(new RecordingSnakeLinter("snake-output"), new RecordingTooManyParametersLinter("params-output")),
+                lastCompletedCount::set);
+
+        assertEquals(2, lastCompletedCount.get());
+    }
+
+    @Test
+    void runAllLintersCompilesJavaSourcesForAsmLinters(@TempDir Path tempDir) throws IOException {
+        LinterRunner runner = new LinterRunner();
+        Path javaFile = Files.writeString(
+                tempDir.resolve("TooManyArgs.java"),
+                String.join(System.lineSeparator(),
+                        "public class TooManyArgs {",
+                        "    public void makeFlag(boolean a, boolean b, boolean c) { }",
+                        "}"));
+
+        String result = runner.runAllLinters(
+                List.of(javaFile.toFile()),
+                List.of(new TooManyParametersLinter(2, new ASMReader())));
+
+        assertTrue(result.contains("Total too-many-parameters issues: 1"));
+        assertTrue(result.contains("makeFlag"));
+    }
+
+        @Test
+        void runAllLintersCompilesWhatItCanWhenOneSourceHasErrors(@TempDir Path tempDir) throws IOException {
+        LinterRunner runner = new LinterRunner();
+        Path validJavaFile = Files.writeString(
+            tempDir.resolve("ValidTooManyArgs.java"),
+            String.join(System.lineSeparator(),
+                "public class ValidTooManyArgs {",
+                "    public void makeFlag(boolean a, boolean b, boolean c) { }",
+                "}"));
+        Path invalidJavaFile = Files.writeString(
+            tempDir.resolve("BrokenFile.java"),
+            String.join(System.lineSeparator(),
+                "public class BrokenFile {",
+                "    public void brokenMethod( {",
+                "}"));
+
+        String result = runner.runAllLinters(
+            List.of(validJavaFile.toFile(), invalidJavaFile.toFile()),
+            List.of(new TooManyParametersLinter(2, new ASMReader())));
+
+        assertTrue(result.contains("Total too-many-parameters issues: 1"));
+        assertTrue(result.contains("makeFlag"));
+        }
+
+        @Test
+        void runAllLintersShowsFallbackMessageWhenLinterReturnsBlank(@TempDir Path tempDir) throws IOException {
+        LinterRunner runner = new LinterRunner();
+        Path javaFile = Files.writeString(
+            tempDir.resolve("NoUnusedImports.java"),
+            String.join(System.lineSeparator(),
+                "public class NoUnusedImports {",
+                "    public void ok() { }",
+                "}"));
+
+        String result = runner.runAllLinters(
+            List.of(javaFile.toFile()),
+            List.of(new UnusedImportLinter()));
+
+        assertTrue(result.contains("[UnusedImportLinter]"));
+        assertTrue(result.contains("No findings reported by this linter."));
+        }
 
     private static final class RecordingSnakeLinter extends SnakeLinter {
         private final String response;
