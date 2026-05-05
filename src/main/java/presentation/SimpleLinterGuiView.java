@@ -3,11 +3,13 @@ package presentation;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.io.File;
 import java.util.List;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JEditorPane;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -15,7 +17,6 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
 
 final class SimpleLinterGuiView {
     private final JFrame frame;
@@ -29,7 +30,7 @@ final class SimpleLinterGuiView {
     private final JButton selectAllLintersButton;
     private final JButton deselectAllLintersButton;
 
-    private final JTextArea resultArea;
+    private final JEditorPane resultArea;
     private final JLabel statusLabel;
 
     SimpleLinterGuiView(JFrame frame, JList<File> fileList, List<JCheckBox> linterCheckBoxes) {
@@ -42,7 +43,7 @@ final class SimpleLinterGuiView {
         this.clearResultsAndLintersButton = new JButton("New Run");
         this.selectAllLintersButton = new JButton("Select All");
         this.deselectAllLintersButton = new JButton("Deselect All");
-        this.resultArea = new JTextArea();
+        this.resultArea = new JEditorPane();
         this.statusLabel = new JLabel("Ready");
 
         configureWindow();
@@ -81,8 +82,13 @@ final class SimpleLinterGuiView {
         return deselectAllLintersButton;
     }
 
-    JTextArea getResultArea() {
+    JEditorPane getResultArea() {
         return resultArea;
+    }
+
+    void setResultHtml(String html) {
+        resultArea.setText(html);
+        resultArea.setCaretPosition(0);
     }
 
     JLabel getStatusLabel() {
@@ -113,7 +119,9 @@ final class SimpleLinterGuiView {
 
     private void configureComponents(JList<File> fileList, List<JCheckBox> linterCheckBoxes) {
         resultArea.setEditable(false);
-        resultArea.setLineWrap(false);
+        resultArea.setContentType("text/html");
+        resultArea.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
+        resultArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11).deriveFont(9.5f));
 
         JScrollPane fileListScrollPane = new JScrollPane(fileList);
         fileListScrollPane.setPreferredSize(new Dimension(350, 400));
