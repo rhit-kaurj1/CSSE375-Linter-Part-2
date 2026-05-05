@@ -3,6 +3,8 @@ package presentation;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -10,6 +12,7 @@ import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.event.HyperlinkEvent;
 
 import datastorage.ConfigLoader;
 import datastorage.OutputExporter;
@@ -30,6 +33,10 @@ public class SimpleLinterGui extends JFrame {
     private final LinterFactory linterFactory;
     private final LinterRunner linterRunner;
     private final ConfigLoader configLoader;
+    private final LintResultHtmlFormatter resultHtmlFormatter;
+    private final SourceFileNavigator sourceFileNavigator;
+
+    private String currentRawOutput;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -49,6 +56,9 @@ public class SimpleLinterGui extends JFrame {
         this.lintRunCoordinator = new LintRunCoordinator(this.linterRunner, this.summaryFormatter);
         this.outputExporter = new OutputExporter();
         this.uiSupport = new SimpleLinterGuiUiSupport();
+        this.resultHtmlFormatter = new LintResultHtmlFormatter();
+        this.sourceFileNavigator = new SourceFileNavigator();
+        this.currentRawOutput = "";
 
         LinterConfig config = this.configLoader.loadConfig(DEFAULT_CONFIG_PATH);
         LinterConfig runAllConfig = new LinterConfig(
@@ -74,6 +84,7 @@ public class SimpleLinterGui extends JFrame {
         view.getClearResultsAndLintersButton().addActionListener(e -> onClearResultsAndLinters());
         view.getSelectAllLintersButton().addActionListener(e -> onSelectAllLinters());
         view.getDeselectAllLintersButton().addActionListener(e -> onDeselectAllLinters());
+        view.getResultArea().addHyperlinkListener(this::onResultLinkActivated);
     }
 
     private void onSelectAllLinters() {
@@ -112,7 +123,8 @@ public class SimpleLinterGui extends JFrame {
     }
 
     private void onClearResultsAndLinters() {
-        view.getResultArea().setText("");
+        currentRawOutput = "";
+        view.setResultHtml(resultHtmlFormatter.toHtml("", List.of()));
         linterSelectionModel.deselectAll();
         view.getStatusLabel().setText("Ready");
     }
@@ -133,7 +145,9 @@ public class SimpleLinterGui extends JFrame {
         }
 
         if (preparation.getStatus() == LintRunCoordinator.PreparationStatus.NO_READABLE_FILES) {
-            view.getResultArea().setText(lintRunCoordinator.formatNoReadableFilesMessage(preparation));
+            String message = lintRunCoordinator.formatNoReadableFilesMessage(preparation);
+            currentRawOutput = message;
+            view.setResultHtml(resultHtmlFormatter.toHtml(message, preparation.getSkippedFiles()));
             return;
         }
 
@@ -142,7 +156,7 @@ public class SimpleLinterGui extends JFrame {
 
     private void runPreparedLint(LintRunCoordinator.Preparation preparation) {
         view.setRunningState(true);
-        view.getResultArea().setText("Running selected linters...\n");
+        view.setResultHtml(resultHtmlFormatter.toHtml("Running selected linters...", preparation.getReadableFiles()));
 
         SwingWorker<String, Void> worker = new SwingWorker<>() {
             @Override
@@ -155,14 +169,18 @@ public class SimpleLinterGui extends JFrame {
             @Override
             protected void done() {
                 try {
-                    view.getResultArea().setText(get());
+                    String result = get();
+                    currentRawOutput = result;
+                    view.setResultHtml(resultHtmlFormatter.toHtml(result, preparation.getReadableFiles()));
                     view.getStatusLabel().setText("Completed");
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
-                    view.getResultArea().setText("Lint run interrupted: " + ex.getMessage());
+                    currentRawOutput = "Lint run interrupted: " + ex.getMessage();
+                    view.setResultHtml(resultHtmlFormatter.toHtml(currentRawOutput, List.of()));
                     view.getStatusLabel().setText("Interrupted");
                 } catch (ExecutionException ex) {
-                    view.getResultArea().setText("Lint run failed: " + ex.getMessage());
+                    currentRawOutput = "Lint run failed: " + ex.getMessage();
+                    view.setResultHtml(resultHtmlFormatter.toHtml(currentRawOutput, List.of()));
                     view.getStatusLabel().setText("Failed");
                 } finally {
                     view.setRunningState(false);
@@ -173,7 +191,7 @@ public class SimpleLinterGui extends JFrame {
     }
 
     private void onSaveOutput() {
-        String output = view.getResultArea().getText();
+        String output = currentRawOutput;
         JFileChooser chooser = uiSupport.createSaveOutputChooser();
 
         int result = chooser.showSaveDialog(this);
@@ -189,6 +207,41 @@ public class SimpleLinterGui extends JFrame {
         } catch (IOException ex) {
             uiSupport.showError(this, "Could not export output: " + ex.getMessage(), "Export Failed");
         }
+    }
+
+    private void onResultLinkActivated(HyperlinkEvent event) {
+        if (event.getEventType() != HyperlinkEvent.EventType.ACTIVATED) {
+            return;
+        }
+
+        String description = event.getDescription();
+        if (description == null || !description.startsWith(LintResultHtmlFormatter.LINK_PREFIX)) {
+            return;
+        }
+
+        try {
+            String filePath = extractLinkValue(description, LintResultHtmlFormatter.FILE_PARAMETER);
+            String lineText = extractLinkValue(description, LintResultHtmlFormatter.LINE_PARAMETER);
+            File targetFile = new File(URLDecoder.decode(filePath, StandardCharsets.UTF_8));
+            int lineNumber = Integer.parseInt(URLDecoder.decode(lineText, StandardCharsets.UTF_8));
+            sourceFileNavigator.openSourceFile(this, targetFile, lineNumber);
+        } catch (IOException | IllegalArgumentException ex) {
+            uiSupport.showError(this, ex.getMessage(), "Cannot Open Source File");
+        }
+    }
+
+    private String extractLinkValue(String description, String parameterName) {
+        String query = description.substring(LintResultHtmlFormatter.LINK_PREFIX.length());
+        String[] parts = query.split("&");
+        String prefix = parameterName + "=";
+
+        for (String part : parts) {
+            if (part.startsWith(prefix)) {
+                return part.substring(prefix.length());
+            }
+        }
+
+        throw new IllegalArgumentException("Missing error location information.");
     }
 
 }
