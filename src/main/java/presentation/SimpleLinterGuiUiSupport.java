@@ -60,7 +60,7 @@ final class SimpleLinterGuiUiSupport {
         int choice = JOptionPane.showConfirmDialog(
                 parent,
                 scrollPane,
-                "Preview Selected Files",
+                "Preview Selected Files and Folders",
                 JOptionPane.OK_CANCEL_OPTION,
                 JOptionPane.PLAIN_MESSAGE);
         return choice == JOptionPane.OK_OPTION;
@@ -74,7 +74,8 @@ final class SimpleLinterGuiUiSupport {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < files.size(); i++) {
             File file = files.get(i);
-            builder.append("File: ").append(file.getPath()).append(System.lineSeparator());
+            String typeLabel = file.isDirectory() ? "Folder" : "File";
+            builder.append(typeLabel).append(": ").append(file.getPath()).append(System.lineSeparator());
             builder.append("--------------------").append(System.lineSeparator());
             builder.append(readPreviewContent(file)).append(System.lineSeparator());
             if (i < files.size() - 1) {
@@ -93,6 +94,10 @@ final class SimpleLinterGuiUiSupport {
             return "<File does not exist>";
         }
 
+        if (file.isDirectory()) {
+            return buildDirectorySummary(file);
+        }
+
         if (file.getName().endsWith(".class")) {
             return "<Binary .class file preview unavailable>";
         }
@@ -102,5 +107,93 @@ final class SimpleLinterGuiUiSupport {
         } catch (IOException ex) {
             return "<Unable to read file: " + ex.getMessage() + ">";
         }
+    }
+
+    private String buildDirectorySummary(File dir) {
+        StringBuilder summary = new StringBuilder();
+        summary.append("<Directory contents:>").append(System.lineSeparator());
+
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return summary.append("<Unable to list directory contents>").toString();
+        }
+
+        int files = 0;
+        int folders = 0;
+        for (File child : children) {
+            if (child.isDirectory()) {
+                folders++;
+            } else {
+                files++;
+            }
+        }
+
+        summary.append("  Files: ").append(files).append(System.lineSeparator());
+        summary.append("  Subdirectories: ").append(folders).append(System.lineSeparator());
+
+        // Show first few entries
+        summary.append("  Contents:").append(System.lineSeparator());
+        int shown = 0;
+        for (File child : children) {
+            if (shown >= 10) {
+                summary.append("    ... and ").append(children.length - shown).append(" more").append(System.lineSeparator());
+                break;
+            }
+            String prefix = child.isDirectory() ? "📁 " : "📄 ";
+            summary.append("    ").append(prefix).append(child.getName()).append(System.lineSeparator());
+            shown++;
+        }
+
+        return summary.toString();
+    }
+
+    /**
+     * Validates selected files for linting.
+     * Returns a list of error messages if validation fails.
+     * Valid items: .java files, .class files, or directories.
+     */
+    List<String> validateSelectedFiles(File[] files) {
+        List<String> errors = new java.util.ArrayList<>();
+
+        if (files == null || files.length == 0) {
+            errors.add("No files selected.");
+            return errors;
+        }
+
+        for (File file : files) {
+            String error = validateSingleFile(file);
+            if (error != null) {
+                errors.add(error);
+            }
+        }
+
+        return errors;
+    }
+
+    private String validateSingleFile(File file) {
+        if (file == null) {
+            return "Null file entry provided.";
+        }
+
+        if (!file.exists()) {
+            return "Invalid path (does not exist): " + file.getAbsolutePath();
+        }
+
+        if (!file.canRead()) {
+            return "Cannot read file (permission denied): " + file.getAbsolutePath();
+        }
+
+        // Directories are allowed (will be expanded when linting)
+        if (file.isDirectory()) {
+            return null;
+        }
+
+        // Check file extension
+        String fileName = file.getName().toLowerCase(java.util.Locale.ROOT);
+        if (fileName.endsWith(".java") || fileName.endsWith(".class")) {
+            return null;
+        }
+
+        return "Invalid file type: " + file.getName() + " (only .java and .class files are supported)";
     }
 }

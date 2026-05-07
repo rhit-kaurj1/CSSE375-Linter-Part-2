@@ -2,9 +2,9 @@ package presentation;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -104,12 +104,30 @@ public class SimpleLinterGui extends JFrame {
         }
 
         File[] selectedFiles = chooser.getSelectedFiles();
-        if (!uiSupport.confirmFilePreview(this, List.of(selectedFiles))) {
+
+        // Validate files before proceeding
+        java.util.List<String> validationErrors = uiSupport.validateSelectedFiles(selectedFiles);
+        if (!validationErrors.isEmpty()) {
+            String errorMessage = buildErrorMessage(validationErrors);
+            uiSupport.showError(this, errorMessage, "Invalid File Selection");
+            return;
+        }
+
+        if (!uiSupport.confirmFilePreview(this, java.util.List.of(selectedFiles))) {
             return;
         }
 
         fileSelectionModel.addFiles(selectedFiles);
         uiSupport.showSelectedFilesStatus(view, fileSelectionModel.size());
+    }
+
+    private String buildErrorMessage(java.util.List<String> errors) {
+        StringBuilder message = new StringBuilder();
+        message.append("Unable to add the following file(s):\n\n");
+        for (String error : errors) {
+            message.append("• ").append(error).append("\n");
+        }
+        return message.toString();
     }
 
     private void onRemoveSelected() {

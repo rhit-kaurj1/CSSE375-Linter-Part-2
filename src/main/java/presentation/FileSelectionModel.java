@@ -16,6 +16,7 @@ final class FileSelectionModel {
         this.fileListModel = new DefaultListModel<>();
         this.fileList = new JList<>(fileListModel);
         this.fileList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        this.fileList.setCellRenderer(new FileListCellRenderer());
     }
 
     JList<File> getListComponent() {
