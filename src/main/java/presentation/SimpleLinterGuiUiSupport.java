@@ -66,6 +66,22 @@ final class SimpleLinterGuiUiSupport {
         return choice == JOptionPane.OK_OPTION;
     }
 
+    void showFilePreview(JFrame parent, List<File> files) {
+        JTextArea previewArea = new JTextArea(buildFilePreview(files));
+        previewArea.setEditable(false);
+        previewArea.setCaretPosition(0);
+        previewArea.setLineWrap(false);
+
+        JScrollPane scrollPane = new JScrollPane(previewArea);
+        scrollPane.setPreferredSize(new java.awt.Dimension(900, 600));
+
+        JOptionPane.showMessageDialog(
+                parent,
+                scrollPane,
+                "File Preview",
+                JOptionPane.PLAIN_MESSAGE);
+    }
+
     String buildFilePreview(List<File> files) {
         if (files.isEmpty()) {
             return "No files selected.";
