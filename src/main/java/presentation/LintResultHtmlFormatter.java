@@ -234,15 +234,55 @@ final class LintResultHtmlFormatter {
     private String resolveFilePath(String fileToken, List<File> availableFiles) {
         if (availableFiles != null) {
             for (File file : availableFiles) {
-                if (file.getPath().equals(fileToken)
-                        || file.getAbsolutePath().equals(fileToken)
-                        || file.getName().equals(fileToken)) {
-                    return file.getPath();
+                String resolved = findMatchingFilePath(file, fileToken);
+                if (resolved != null) {
+                    return resolved;
                 }
             }
         }
 
         return fileToken;
+    }
+
+    private String findMatchingFilePath(File file, String fileToken) {
+        if (file == null || !file.exists()) {
+            return null;
+        }
+
+        String normalizedToken = normalizePath(fileToken);
+
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children == null) {
+                return null;
+            }
+
+            for (File child : children) {
+                String resolved = findMatchingFilePath(child, fileToken);
+                if (resolved != null) {
+                    return resolved;
+                }
+            }
+            return null;
+        }
+
+        String path = file.getPath();
+        String absolutePath = file.getAbsolutePath();
+        String fileName = file.getName();
+
+        if (path.equals(fileToken)
+                || absolutePath.equals(fileToken)
+                || fileName.equals(fileToken)
+                || normalizePath(path).endsWith("/" + normalizedToken)
+                || normalizePath(absolutePath).endsWith("/" + normalizedToken)) {
+            return path;
+        }
+
+        return null;
+    }
+
+    private String normalizePath(String value) {
+        return value.replace('\\', '/');
     }
 
     private String buildGoToLink(String filePath, int lineNumber) {

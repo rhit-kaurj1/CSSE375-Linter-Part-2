@@ -4,6 +4,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,19 @@ class LintResultHtmlFormatterTest {
 
         assertTrue(html.contains("Go to error"));
         assertTrue(html.contains("Example.java:4 - Unused import: java.util.List"));
+    }
+
+    @Test
+    void toHtmlResolvesFilenameOnlyEntriesInsideSelectedDirectory(@TempDir Path tempDir) throws Exception {
+        Path nestedDir = Files.createDirectories(tempDir.resolve("main"));
+        Path filePath = Files.writeString(nestedDir.resolve("City.java"), "class City {}\n");
+        String report = "City.java:2 - Unused import: java.util.List";
+
+        String html = new LintResultHtmlFormatter().toHtml(report, List.of(tempDir.toFile()));
+
+        String expectedEncodedPath = URLEncoder.encode(filePath.toString(), StandardCharsets.UTF_8);
+        assertTrue(html.contains("goto?file=" + expectedEncodedPath + "&line=2"));
+        assertTrue(html.contains("Go to error"));
     }
 
     @Test
