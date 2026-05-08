@@ -9,8 +9,8 @@ import java.util.List;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JEditorPane;
 import javax.swing.JCheckBox;
+import javax.swing.JEditorPane;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -30,11 +30,13 @@ final class SimpleLinterGuiView {
     private final JButton selectAllLintersButton;
     private final JButton deselectAllLintersButton;
 
+    private final JList<File> fileList;
     private final JEditorPane resultArea;
     private final JLabel statusLabel;
 
     SimpleLinterGuiView(JFrame frame, JList<File> fileList, List<JCheckBox> linterCheckBoxes) {
         this.frame = frame;
+        this.fileList = fileList;
         this.addFilesButton = new JButton("Add Files");
         this.removeSelectedButton = new JButton("Remove Selected");
         this.clearAllButton = new JButton("Clear All");
@@ -60,6 +62,10 @@ final class SimpleLinterGuiView {
 
     JButton getClearAllButton() {
         return clearAllButton;
+    }
+
+    JList<File> getFileList() {
+        return fileList;
     }
 
     JButton getRunLintersButton() {

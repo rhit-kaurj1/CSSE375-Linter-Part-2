@@ -1,5 +1,7 @@
 package presentation;
 
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -85,6 +87,14 @@ public class SimpleLinterGui extends JFrame {
         view.getSelectAllLintersButton().addActionListener(e -> onSelectAllLinters());
         view.getDeselectAllLintersButton().addActionListener(e -> onDeselectAllLinters());
         view.getResultArea().addHyperlinkListener(this::onResultLinkActivated);
+        view.getFileList().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    onFileDoubleClicked();
+                }
+            }
+        });
     }
 
     private void onSelectAllLinters() {
@@ -138,6 +148,15 @@ public class SimpleLinterGui extends JFrame {
     private void onClearAll() {
         fileSelectionModel.clear();
         view.getStatusLabel().setText("Ready");
+    }
+
+    private void onFileDoubleClicked() {
+        List<File> selectedFiles = fileSelectionModel.getSelectedFiles();
+        if (selectedFiles.isEmpty()) {
+            return;
+        }
+
+        uiSupport.showFilePreview(this, selectedFiles);
     }
 
     private void onClearResultsAndLinters() {

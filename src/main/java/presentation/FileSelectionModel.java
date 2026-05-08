@@ -55,6 +55,10 @@ final class FileSelectionModel {
         return files;
     }
 
+    List<File> getSelectedFiles() {
+        return fileList.getSelectedValuesList();
+    }
+
     private boolean containsFile(File candidate) {
         String candidatePath = candidate.getAbsolutePath();
         for (int i = 0; i < fileListModel.size(); i++) {
