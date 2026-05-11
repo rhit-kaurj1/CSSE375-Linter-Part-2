@@ -1,6 +1,7 @@
 package system;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -28,7 +29,14 @@ class LinterSystemTest {
         Files.writeString(javaFile, String.join(System.lineSeparator(),
                 "import java.util.List;",
                 "public class BadName {    ",
-                "    private int badField = 1;    ",
+            "    private static final int MAX_PLAYERS = 4;",
+            "    private int bad_field = 1;    ",
+            "    public BadName() {",
+            "        this.bad_field = 2;",
+            "    }",
+            "    void BadMethod(String BadParam) {",
+            "        int bad_local = 0;",
+            "    }",
                 "}"));
 
         Path configFile = tempDir.resolve("linter.properties");
@@ -51,9 +59,13 @@ class LinterSystemTest {
         assertTrue(output.contains("[SnakeLinter]"));
         assertTrue(output.contains("[UnusedImportLinter]"));
         assertTrue(output.contains("[TrailingWhitespaceLinter]"));
-        assertTrue(output.contains("Class name 'BadName' does not follow snake_case"));
-        assertTrue(output.contains("Field name 'badField' does not follow snake_case"));
+        assertTrue(output.contains("MethodDeclaration 'BadMethod' does not follow camelCase"));
+        assertTrue(output.contains("VariableDeclarator 'bad_field' does not follow camelCase"));
+        assertTrue(output.contains("VariableDeclarator 'bad_local' does not follow camelCase"));
+        assertTrue(output.contains("Parameter 'BadParam' does not follow camelCase"));
         assertTrue(output.contains("Unused import: java.util.List"));
         assertTrue(output.contains("Total trailing whitespace issues: 2"));
+        assertFalse(output.contains("BadName' does not follow camelCase"));
+        assertFalse(output.contains("MAX_PLAYERS' does not follow camelCase"));
     }
 }

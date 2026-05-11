@@ -1,95 +1,64 @@
 package domain;
 
 import java.io.File;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import com.github.javaparser.ParseProblemException;
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.expr.SimpleName;
 
 /**
- * Linter that checks if class names, field names, and variable names follow
- * snake_case convention.
- * Reports any violations with line numbers and the violating identifier.
+ * Linter that checks camelCase naming for a strict allowlist of declarations:
+ * MethodDeclaration, VariableDeclarator, and Parameter.
+ * Everything else is ignored by default.
  */
 public class SnakeLinter extends AbstractSourceLinter {
 
-    private static final Pattern CLASS_PATTERN = Pattern
-            .compile("\\b(?:public|private|protected)?\\s*(?:abstract)?\\s*class\\s+([a-zA-Z_][a-zA-Z0-9_]*)");
-    private static final Pattern FIELD_PATTERN = Pattern.compile(
-            "\\b(?:public|private|protected|static|final)+\\s+(?:int|String|boolean|double|float|long|char|byte|short|void|[a-zA-Z_][a-zA-Z0-9_]*)(?:\\[\\])*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;]");
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile(
-            "\\b(?:int|String|boolean|double|float|long|char|byte|short|void|[a-zA-Z_][a-zA-Z0-9_]*)(?:\\[\\])*\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;,)]");
-
-    private static final Pattern SNAKE_CASE_PATTERN = Pattern.compile("^[a-z][a-z0-9]*(_[a-z0-9]+)*$|^[a-z]$");
+    private static final String CAMEL_CASE_REGEX = "^[a-z][a-zA-Z0-9]*$";
 
     @Override
     protected void lintFile(File file, String content, StringBuilder violations) {
-        String[] lines = content.split("\n");
+        try {
+            CompilationUnit compilationUnit = StaticJavaParser.parse(content);
 
-        // Check class names and other identifiers
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-
-            // Check class declarations
-            Matcher classMatcher = CLASS_PATTERN.matcher(line);
-            while (classMatcher.find()) {
-                String className = classMatcher.group(1);
-                if (isSnakeCaseViolation(className)) {
-                    violations.append(file.getName()).append(":").append(i + 1)
-                            .append(" - Class name '").append(className).append("' does not follow snake_case\n");
-                }
+            for (MethodDeclaration method : compilationUnit.findAll(MethodDeclaration.class)) {
+                checkCamelCase(file, "MethodDeclaration", method.getName(), method.getNameAsString(), violations);
             }
 
-            // Skip comments and string literals for field/variable checking (using helper
-            // from base class)
-            String cleanLine = removeComments(line);
-
-            // Check field declarations
-            Matcher fieldMatcher = FIELD_PATTERN.matcher(cleanLine);
-            while (fieldMatcher.find()) {
-                String fieldName = fieldMatcher.group(1);
-                if (isSnakeCaseViolation(fieldName)) {
-                    violations.append(file.getName()).append(":").append(i + 1)
-                            .append(" - Field name '").append(fieldName).append("' does not follow snake_case\n");
+            for (VariableDeclarator variable : compilationUnit.findAll(VariableDeclarator.class)) {
+                if (isStaticFinalField(variable)) {
+                    continue;
                 }
+                checkCamelCase(file, "VariableDeclarator", variable.getName(), variable.getNameAsString(), violations);
             }
 
-            // Check variable declarations
-            Matcher variableMatcher = VARIABLE_PATTERN.matcher(cleanLine);
-            while (variableMatcher.find()) {
-                String variableName = variableMatcher.group(1);
-                if (isSnakeCaseViolation(variableName) && !isKeywordOrType(variableName)) {
-                    violations.append(file.getName()).append(":").append(i + 1)
-                            .append(" - Variable name '").append(variableName).append("' does not follow snake_case\n");
-                }
+            for (Parameter parameter : compilationUnit.findAll(Parameter.class)) {
+                checkCamelCase(file, "Parameter", parameter.getName(), parameter.getNameAsString(), violations);
             }
+        } catch (ParseProblemException ex) {
+            // Ignore unparsable files so naming checks stay non-blocking.
         }
     }
 
-    /**
-     * Checks if an identifier violates snake_case convention
-     * Returns true if it doesn't follow snake_case
-     */
-    private boolean isSnakeCaseViolation(String identifier) {
-        return !SNAKE_CASE_PATTERN.matcher(identifier).matches();
+    private void checkCamelCase(File file, String declarationType, SimpleName nameNode, String identifier,
+            StringBuilder violations) {
+        if (identifier.matches(CAMEL_CASE_REGEX)) {
+            return;
+        }
+
+        int line = nameNode.getBegin().map(position -> position.line).orElse(1);
+        violations.append(file.getName()).append(":").append(line)
+                .append(" - ").append(declarationType).append(" '").append(identifier)
+                .append("' does not follow camelCase\n");
     }
 
-    /**
-     * Checks if a string is a Java keyword or primitive type
-     */
-    private boolean isKeywordOrType(String word) {
-        String[] keywords = {
-                "int", "String", "boolean", "double", "float", "long", "char", "byte", "short", "void",
-                "public", "private", "protected", "static", "final", "class", "interface", "extends",
-                "implements", "new", "return", "if", "else", "for", "while", "do", "switch", "case",
-                "default", "break", "continue", "try", "catch", "finally", "throw", "throws", "import",
-                "package", "abstract", "synchronized", "volatile", "transient", "native", "strictfp",
-                "super", "this", "true", "false", "null"
-        };
-
-        for (String keyword : keywords) {
-            if (word.equals(keyword)) {
-                return true;
-            }
-        }
-        return false;
+    private boolean isStaticFinalField(VariableDeclarator variable) {
+        return variable.findAncestor(FieldDeclaration.class)
+                .map(field -> field.isStatic() && field.isFinal())
+                .orElse(false);
     }
 }
